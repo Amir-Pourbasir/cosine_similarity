@@ -1,0 +1,57 @@
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load the Excel file into a DataFrame
+df = pd.read_excel('Flexible_1.xlsx')
+
+# Initialize a DataFrame to store the merged DMUs
+merged_df = pd.DataFrame(columns=['DMUs', 'Decision Making Styles', 'Demographic Combination 1', 'Demographic Combination 2', 'Sum Count'])
+
+# Process until all DMUs are combined
+while True:
+    # Filter DMUs with Count 3 and Count 5
+    count_3 = df[df['Count'] == 3]
+    count_5 = df[df['Count'] == 5]
+
+    # Check if there are valid samples for cosine similarity calculation
+    if len(count_3) == 0 or len(count_5) == 0:
+        break
+
+    max_cosine_similarity = -1  # Initialize maximum cosine similarity
+    best_pair = None  # Initialize the best pair
+
+    # Iterate through all combinations of Count 3 and Count 5 DMUs
+    for index_3, row_3 in count_3.iterrows():
+        for index_5, row_5 in count_5.iterrows():
+            # Calculate cosine similarity between Demographic Combinations
+            similarity = cosine_similarity(
+                np.array([row_3['Demographic Combination'], row_5['Demographic Combination']]).reshape(1, -1)
+            )[0][0]
+
+            if similarity > max_cosine_similarity:
+                max_cosine_similarity = similarity
+                best_pair = (index_3, index_5)
+
+    # Combine the DMUs with the best similarity
+    if best_pair:
+        index_3, index_5 = best_pair
+        combined_dmu = pd.Series({
+            'DMUs': f"{df.loc[index_3, 'DMUs']}-{df.loc[index_5, 'DMUs']}",
+            'Decision Making Styles': f"{df.loc[index_3, 'Decision Making Styles']}-{df.loc[index_5, 'Decision Making Styles']}",
+            'Demographic Combination 1': df.loc[index_3, 'Demographic Combination'],
+            'Demographic Combination 2': df.loc[index_5, 'Demographic Combination'],
+            'Sum Count': df.loc[index_3, 'Count'] + df.loc[index_5, 'Count']
+        })
+
+        # Append the combined DMU to the merged DataFrame
+        merged_df = merged_df.append(combined_dmu, ignore_index=True)
+
+        # Remove the combined DMUs from the original DataFrame
+        df = df.drop([index_3, index_5])
+
+# Add any remaining unchanged DMUs to the merged DataFrame
+merged_df = merged_df.append(df, ignore_index=True)
+
+# Save the merged DataFrame to a new Excel file
+merged_df.to_excel('Merged_Flexible_1.xlsx', index=False, engine='openpyxl')
